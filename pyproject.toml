@@ -1,0 +1,30 @@
+[project]
+name = "dev-journal"
+version = "0.1.0"
+description = "로컬 git 커밋 + 클로드 코드 대화로 개발 일지 자동 생성"
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=0.117",
+    "pydantic>=2.13",
+    "psycopg[binary]>=3.3",
+    "python-dotenv>=1.2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=9.0"]
+
+[project.scripts]
+# jounrnal 프로그램 파일 생성. 가상환 활성화 -> 가상 환경이 PATH에 등록됨
+# -> journal 명령어로 터미널에서 이 프로그램 실행 가능.
+journal = "journal.main:cli"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "src"]
+addopts = "--doctest-modules"
