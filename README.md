@@ -1,7 +1,6 @@
 # dev-journal
 
-
-Uploading 화면 녹화 중 2026-07-22 082838.mp4…
+https://github.com/user-attachments/assets/e2755a38-8797-4dd9-9ef4-6716a711bb70
 
 
 
