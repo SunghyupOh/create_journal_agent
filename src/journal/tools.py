@@ -28,8 +28,12 @@ def _log(msg: str) -> None:
 
     stderr 로 보낸다 — stdout 은 파이프라인 결과 출력용이라 섞이면 안 된다.
     flush 는 필수. LLM 호출 대기 중에 버퍼에 걸려 있으면 실시간으로 안 보인다.
+
+    `\\r\\033[K` 는 스피너(progress.spinner)가 그리던 줄을 지우고 시작하는 것 —
+    없으면 도구 로그가 스피너와 같은 줄에 겹쳐 찍힌다. 스피너는 0.1초 뒤 아랫줄에
+    다시 그려진다.
     """
-    print(f"    [도구] {msg}", file=sys.stderr, flush=True)
+    print(f"\r\033[K    [도구] {msg}", file=sys.stderr, flush=True)
 
 #: API 에 넘길 tool 정의. description 이 호출 조건을 정한다 —
 #: "생략됨 표시가 있을 때만" 을 명시해야 멀쩡한 diff 까지 재조회하지 않는다.

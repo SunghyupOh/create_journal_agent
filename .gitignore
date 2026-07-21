@@ -9,7 +9,7 @@ dist/
 
 # 생성물 — 일지 md 는 나중에(10+) 별도 private 레포로 간다.
 # 소스 레포에 넣으면 수집 대상 저장소에 일지가 섞이는 피드백 루프가 생긴다.
-created_jounals/
+created_journals/
 
 # Windows 가 만드는 부산물
 *:Zone.Identifier

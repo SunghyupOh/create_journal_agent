@@ -23,7 +23,7 @@ BOOTSTRAP_START = date(2026, 7, 19)
 
 
 #: 일지 마크다운이 쌓이는 곳. 나중에(10+) 이 디렉터리를 private git 레포로 만든다.
-JOURNAL_DIR = "~/dev-jounal/created_jounals"
+JOURNAL_DIR = "~/dev-journal/created_journals"
 
 #: 요약 LLM. 모델 ID는 입력 지문에 들어가므로 바꾸면 잠정 일지가 자동 재생성된다 (§4).
 MODEL = "claude-sonnet-5"

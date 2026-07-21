@@ -19,7 +19,7 @@ import sys
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from journal import collect_git, collect_sessions, config, dates, db, summarize, write
+from journal import collect_git, collect_sessions, config, dates, db, progress, summarize, write
 
 
 def run(max_days: int | None = None) -> int:
@@ -46,14 +46,20 @@ def run(max_days: int | None = None) -> int:
         print(f"대상: {todo[0]} ~ {todo[-1]} ({len(todo)}일" + (f", {remaining}일 남음)" if remaining else ")"))
 
         # 그 day : 개수 를 원소로 갖는 리스트 counts
-        git_counts = collect_git.collect(conn, todo)
-        session_counts = collect_sessions.collect(conn, todo)
+        with progress.spinner("git 커밋 수집 중"):
+            git_counts = collect_git.collect(conn, todo)
+        print(f"수집: git 커밋 {sum(git_counts.values())}건")
+
+        with progress.spinner("클로드 세션 수집 중"):
+            session_counts = collect_sessions.collect(conn, todo)
+        print(f"수집: 세션 {sum(session_counts.values())}건")
 
         failed = 0
         for day in todo:
             try:
                 #summarize_day -> LLM 호출해서 요약본 만들고 db에 저장 + status(failed, skipped 등) 반환
-                status = summarize.summarize_day(conn, day, today)
+                with progress.spinner(f"{day} 요약 중 (LLM 응답 대기)"):
+                    status = summarize.summarize_day(conn, day, today)
             except Exception as e:
                 # summarize_day 가 이미 failed 마킹 + 로그를 남겼다. 다음 날짜로.
                 print(f"  {day}: 실패 — {e}", file=sys.stderr)
@@ -84,9 +90,17 @@ def cli() -> None:
         help="이번 실행에서 처리할 최대 날짜 수 (LLM 비용 제한). 나머지는 다음 실행에서",
     )
 
+    p_web = sub.add_parser("web", help="로컬 웹 UI (실행 버튼 + step 표시 + 일지 뷰어)")
+    p_web.add_argument("--port", type=int, default=8000)
+
     args = parser.parse_args()
     if args.command == "run":
         sys.exit(1 if run(max_days=args.max_days) else 0)
+    elif args.command == "web":
+        import uvicorn  # web 안 쓰는 실행까지 느려지지 않게 여기서 import
+
+        print(f"http://127.0.0.1:{args.port} — Ctrl+C 로 종료")
+        uvicorn.run("journal_web.app:app", host="127.0.0.1", port=args.port)
 
 
 if __name__ == "__main__":

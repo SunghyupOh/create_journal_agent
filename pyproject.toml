@@ -8,6 +8,8 @@ dependencies = [
     "pydantic>=2.13",
     "psycopg[binary]>=3.3",
     "python-dotenv>=1.2",
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
 ]
 
 [project.optional-dependencies]
@@ -24,6 +26,10 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+# html 은 .py 가 아니라서 명시해야 설치본에 포함된다 (editable 은 상관없지만 wheel 대비)
+journal_ui = ["*.html"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "src"]

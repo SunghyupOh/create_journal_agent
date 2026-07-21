@@ -116,7 +116,7 @@ def build_input(data: DayInput) -> str:
 _MAX_TURNS = 8
 
 
-def call_llm(day: date, grouped_input: str, repo_by_hash: dict[str, str]) -> JournalSummary:
+def call_llm(day: date, grouped_input: str, diff_tool: tools.DiffTool) -> JournalSummary:
     """비스트리밍 호출 + tool 루프 (§4). 스키마 준수는 API 가 보장한다 (D23).
 
     LLM 이 잘린 diff 를 더 봐야겠다고 판단하면 `stop_reason == "tool_use"` 로 멈춘다.
@@ -127,11 +127,27 @@ def call_llm(day: date, grouped_input: str, repo_by_hash: dict[str, str]) -> Jou
     예외를 던지면 호출부가 journals 를 failed 로 마킹하고 다음 실행이 재시도한다 (D17).
     """
     client = anthropic.Anthropic(max_retries=3)
-    diff_tool = tools.DiffTool(repo_by_hash)
+    # diff_tool 은 호출부(summarize_day)가 만들어 넘긴다 — 루프가 끝난 뒤에도
+    # 호출부가 diff_tool.calls 를 읽어 run_logs 에 남길 수 있게 하기 위해서다.
     # 루프를 돌며 assistant 응답과 tool 결과가 뒤에 계속 붙는다 — API 는 무상태라
     # 매 호출마다 대화 전체를 다시 보낸다.
+    #
+    # cache_control: "여기까지(tools + system + 이 메시지)를 캐시해라" 표시.
+    # tool 루프 2턴째부터 이 구간(하루치 입력 전체)이 ~10% 가격으로 처리된다.
+    # tool 을 안 쓰는 날은 1회 호출로 끝나 캐시 읽기가 없다 — 쓰기 1.25배만 내지만
+    # 하루 1회 파이프라인이라 프리픽스 재사용처가 루프뿐이니 감수한다.
     messages: list = [
-        {"role": "user", "content": prompts.user_input(day.isoformat(), grouped_input)}
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": prompts.user_input(day.isoformat(), grouped_input),
+                    "cache_control": {"type": "ephemeral"},
+                    #cache_control 이 api 서버에서 체크 포인트로 작용해 이전 텍스트를 캐싱한다.
+                }
+            ],
+        }
     ]
 
     for _ in range(_MAX_TURNS):
@@ -144,7 +160,7 @@ def call_llm(day: date, grouped_input: str, repo_by_hash: dict[str, str]) -> Jou
             messages=messages,
             tools=[tools.TOOL_SCHEMA],
             output_format=JournalSummary,
-        )
+        ) # 이 인자 값들로 api서버는 컨텍스트를 조립하고 모델 응답을 반환해줌. 
 
         if response.stop_reason == "end_turn":
             return response.parsed_output
@@ -211,9 +227,12 @@ def summarize_day(conn: psycopg.Connection, day: date, today: date) -> str:
 
     # DiffTool 용 hash → repo 경로 맵. LLM 에게 경로를 맡기지 않고 코드가 역참조한다.
     repo_by_hash = {c[2]: c[0] for c in data.commits}
+    # 여기서 만들어 넘기는 이유: 요약이 끝난 뒤 diff_tool.calls 로
+    # "도구를 몇 번 썼는지"를 run_logs 에 남기기 위해 (관측성).
+    diff_tool = tools.DiffTool(repo_by_hash)
 
     try:
-        summary = call_llm(day, build_input(data), repo_by_hash)
+        summary = call_llm(day, build_input(data), diff_tool)
     except Exception as e:
         save(conn, day, None, "failed")
         db.log_run(conn, "summarize", "failed", journal_date=day, detail=str(e))
@@ -223,6 +242,7 @@ def summarize_day(conn: psycopg.Connection, day: date, today: date) -> str:
     save(conn, day, summary, status)
     db.log_run(
         conn, "summarize", "ok", journal_date=day,
-        detail=f"work {len(summary.work)}, trouble {len(summary.troubleshooting)}, pending {len(summary.pending)}",
+        detail=f"work {len(summary.work)}, trouble {len(summary.troubleshooting)},"
+               f" pending {len(summary.pending)}, tool {diff_tool.calls}회",
     )
     return status
